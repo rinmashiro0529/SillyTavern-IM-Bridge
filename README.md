@@ -34,6 +34,7 @@ SillyTavern server plugin: bridge ST chats to instant messaging channels (curren
 
 1. 启用 plugin，重启 ST，确认日志出现 `[st-im-bridge] init complete`。
 2. `curl --cookie <ST 会话 cookie> http://localhost:8000/api/plugins/st-im-bridge/probe` 返回 204。
+   > 提示：cookie 含登录态，避免直接粘贴到 shell 命令行（会进 history）。建议把 cookie 写入受限权限的文件用 `--cookie @cookies.txt` 读入，或先 `read -s COOKIE` 再 `curl --cookie "$COOKIE" ...`。
 3. 安装 UI 扩展，打开抽屉，填入 Telegram bot token，点击「保存 Token」「启动」。
 4. Telegram 私聊 bot：`/help`、`/chars`、`/now`、`/compress`、`/cmodel` 等命令应当与原 bridge 行为一致。
 
