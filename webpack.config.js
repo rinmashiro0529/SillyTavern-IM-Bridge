@@ -13,7 +13,12 @@ module.exports = (_env, argv) => {
       library: { type: "commonjs2" },
       clean: true,
     },
-    resolve: { extensions: [".ts", ".js"] },
+    resolve: {
+      extensions: [".ts", ".js"],
+      alias: {
+        "abort-controller$": path.resolve(__dirname, "src/plugin/abort-controller-shim.js"),
+      },
+    },
     module: {
       rules: [
         {
