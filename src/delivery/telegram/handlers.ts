@@ -250,6 +250,32 @@ function getLatestTelegramTurn(deps: AppServices, accountId: string, chatId: str
 }
 
 export function registerHandlers(bot: Bot<BotContext>, deps: AppServices, botCtx: BotInstanceContext): void {
+  bot.command("bind", async (ctx) => {
+    const userId = getTelegramUserId(ctx);
+    if (!userId) return;
+    const text = ctx.message?.text ?? "";
+    const code = text.split(/\s+/)[1]?.trim() ?? "";
+    if (!code) {
+      await replyText(ctx, botCtx, "用法：/bind <验证码>\n请在 SillyTavern 网页端的 IM Bridge 抽屉里点「生成绑定码」获取。");
+      return;
+    }
+    const outcome = deps.bindCodeService.redeem(botCtx.accountId, code, userId);
+    switch (outcome) {
+      case "ok":
+        await replyText(ctx, botCtx, "✅ 绑定成功，现在可以使用 /help 查看命令了。");
+        return;
+      case "invalid":
+        await replyText(ctx, botCtx, "❌ 验证码无效或已被使用。");
+        return;
+      case "expired":
+        await replyText(ctx, botCtx, "⌛ 验证码已过期，请在网页端重新生成。");
+        return;
+      case "rate_limited":
+        await replyText(ctx, botCtx, "⛔ 尝试次数过多，请稍后再试（至多 1 小时）。");
+        return;
+    }
+  });
+
   bot.command("start", async (ctx) => {
     const userId = await requireAuthorized(ctx, deps, botCtx);
     if (!userId) {

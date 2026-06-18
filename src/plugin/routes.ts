@@ -586,6 +586,33 @@ export function registerRoutes(router: Router, services: AppServices): void {
     res.json(serializeAccount(accountId));
   }));
 
+  router.delete("/admin/accounts/:handle/allowed-users/:tgId", requireSelfOrAdmin(), asyncHandler(async (req, res) => {
+    const accountId = targetAccountId(req);
+    services.accountConfigService.removeAllowedUser(accountId, req.params.tgId);
+    res.json(serializeAccount(accountId));
+  }));
+
+  router.post("/admin/accounts/:handle/bind-code", requireSelfOrAdmin(), asyncHandler(async (req, res) => {
+    const accountId = targetAccountId(req);
+    const result = services.bindCodeService.generate(accountId);
+    res.json(result);
+  }));
+
+  router.get("/admin/accounts/:handle/bind-code", requireSelfOrAdmin(), asyncHandler(async (req, res) => {
+    const accountId = targetAccountId(req);
+    const active = services.bindCodeService.getActive(accountId);
+    if (!active) {
+      throw new AppError("NO_ACTIVE_BIND_CODE", "无活跃绑定码", 404);
+    }
+    res.json(active);
+  }));
+
+  router.delete("/admin/accounts/:handle/bind-code", requireSelfOrAdmin(), asyncHandler(async (req, res) => {
+    const accountId = targetAccountId(req);
+    services.bindCodeService.revoke(accountId);
+    res.status(204).end();
+  }));
+
   router.put("/admin/accounts/:handle/compress-config", requireSelfOrAdmin(), asyncHandler(async (req, res) => {
     const accountId = targetAccountId(req);
     const compress = typeof req.body?.compress === "object" && req.body.compress ? req.body.compress as Record<string, number> : {};

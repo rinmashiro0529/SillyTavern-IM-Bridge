@@ -6,6 +6,7 @@ import { ModelService } from "../core/services/model-service";
 import { SessionService } from "../core/services/session-service";
 import { SessionTaskQueue } from "../core/services/session-task-queue";
 import { AccountConfigService } from "../core/services/account-config-service";
+import { BindCodeService } from "../core/services/bind-code-service";
 import { BotManager } from "../core/services/bot-manager";
 import { CompressionClient } from "../infra/llm/compression-client";
 import { createSqlitePersistence } from "../infra/persistence/sqlite-store";
@@ -40,6 +41,7 @@ export interface AppServices {
   modelService: ModelService;
   compressionService: CompressionService;
   accountConfigService: AccountConfigService;
+  bindCodeService: BindCodeService;
   botManager: BotManager;
   repositories: ReturnType<typeof createSqlitePersistence>;
   sseRegistry: SseRegistry;
@@ -78,6 +80,10 @@ export function buildServices(): AppServices {
     repositories.accountRepository,
     repositories.accountConfigRepository,
   );
+  const bindCodeService = new BindCodeService(
+    repositories.bindCodeRepository,
+    accountConfigService,
+  );
 
   const services: Omit<AppServices, "botManager"> & { botManager?: BotManager } = {
     runtime,
@@ -89,6 +95,7 @@ export function buildServices(): AppServices {
     modelService,
     compressionService,
     accountConfigService,
+    bindCodeService,
     repositories,
     sseRegistry: new SseRegistry(),
   };

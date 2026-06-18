@@ -1,6 +1,7 @@
 import type { BotCommand } from "grammy/types";
 
 export const BOT_COMMANDS: BotCommand[] = [
+  { command: "bind", description: "首次使用：用网页端获取的验证码绑定本号" },
   { command: "start", description: "开始使用" },
   { command: "chars", description: "选择角色" },
   { command: "hist", description: "查看历史会话" },

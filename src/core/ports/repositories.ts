@@ -78,6 +78,21 @@ export interface AccountConfigRepository {
   remove(accountId: string): void;
 }
 
+export interface BindCodeRecord {
+  accountId: string;
+  code: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface BindCodeRepository {
+  upsert(accountId: string, code: string, expiresAt: string): BindCodeRecord;
+  getByAccount(accountId: string): BindCodeRecord | null;
+  consume(accountId: string, code: string, nowIso: string): BindCodeRecord | null;
+  deleteByAccount(accountId: string): void;
+  deleteExpired(nowIso: string): void;
+}
+
 export interface SessionRepository {
   getActiveSession(accountId: string): ActiveSession | null;
   setActiveCharacter(accountId: string, avatar: string, name: string): void;

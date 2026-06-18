@@ -43,6 +43,28 @@ export class AccountConfigService {
     return this.update(accountId, { telegramAllowedUserIds: cleaned });
   }
 
+  public addAllowedUser(accountId: string, telegramUserId: string): AccountConfigRecord {
+    const id = String(telegramUserId).trim();
+    if (!id) {
+      throw new AppError("ALLOWED_USER_EMPTY", "TG 用户 ID 不能为空", 400);
+    }
+    const cfg = this.ensure(accountId);
+    if (cfg.telegramAllowedUserIds.includes(id)) {
+      return cfg;
+    }
+    return this.update(accountId, { telegramAllowedUserIds: [...cfg.telegramAllowedUserIds, id] });
+  }
+
+  public removeAllowedUser(accountId: string, telegramUserId: string): AccountConfigRecord {
+    const id = String(telegramUserId).trim();
+    const cfg = this.ensure(accountId);
+    const next = cfg.telegramAllowedUserIds.filter((existing) => existing !== id);
+    if (next.length === cfg.telegramAllowedUserIds.length) {
+      return cfg;
+    }
+    return this.update(accountId, { telegramAllowedUserIds: next });
+  }
+
   public isTelegramUserAllowed(accountId: string, telegramUserId: string): boolean {
     const cfg = this.configRepo.get(accountId);
     if (!cfg) return false;

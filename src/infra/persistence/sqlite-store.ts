@@ -20,6 +20,8 @@ import type {
   AccountConfigRepository,
   AccountRepository,
   AccountRole,
+  BindCodeRecord,
+  BindCodeRepository,
   HistorySyncRepository,
   HistorySyncSnapshot,
   STUserAccount,
@@ -717,6 +719,16 @@ function ensureCurrentSchema(db: DatabaseSync): void {
     );
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bind_codes (
+      account_id TEXT PRIMARY KEY REFERENCES accounts(account_id) ON DELETE CASCADE,
+      code       TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_bind_codes_code ON bind_codes(code);
+  `);
+
   const activeSessionColumns = getTableColumns(db, "active_sessions");
   if (activeSessionColumns.length > 0 && !activeSessionColumns.includes("current_model")) {
     db.exec(`ALTER TABLE active_sessions ADD COLUMN current_model TEXT`);
@@ -883,6 +895,7 @@ export function createSqlitePersistence(databasePath: string): {
   db: DatabaseSync;
   accountRepository: SqliteAccountRepository;
   accountConfigRepository: SqliteAccountConfigRepository;
+  bindCodeRepository: SqliteBindCodeRepository;
   sessionRepository: SqliteSessionRepository;
   turnRepository: SqliteTurnRepository;
   historySyncRepository: SqliteHistorySyncRepository;
@@ -989,6 +1002,7 @@ export function createSqlitePersistence(databasePath: string): {
     db,
     accountRepository: new SqliteAccountRepository(db),
     accountConfigRepository: new SqliteAccountConfigRepository(db),
+    bindCodeRepository: new SqliteBindCodeRepository(db),
     sessionRepository: new SqliteSessionRepository(db),
     turnRepository: new SqliteTurnRepository(db),
     historySyncRepository: new SqliteHistorySyncRepository(db),
@@ -1144,6 +1158,64 @@ export class SqliteAccountConfigRepository implements AccountConfigRepository {
 
   public remove(accountId: string): void {
     this.db.prepare(`DELETE FROM account_configs WHERE account_id = ?`).run(accountId);
+  }
+}
+
+function parseBindCodeRow(row: Record<string, unknown>): BindCodeRecord {
+  return {
+    accountId: String(row.account_id),
+    code: String(row.code),
+    createdAt: String(row.created_at),
+    expiresAt: String(row.expires_at),
+  };
+}
+
+export class SqliteBindCodeRepository implements BindCodeRepository {
+  private readonly db: DatabaseSync;
+
+  public constructor(db: DatabaseSync) {
+    this.db = db;
+  }
+
+  public upsert(accountId: string, code: string, expiresAt: string): BindCodeRecord {
+    const now = nowIso();
+    this.db.prepare(`
+      INSERT INTO bind_codes (account_id, code, created_at, expires_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(account_id) DO UPDATE SET
+        code = excluded.code,
+        created_at = excluded.created_at,
+        expires_at = excluded.expires_at
+    `).run(accountId, code, now, expiresAt);
+    return { accountId, code, createdAt: now, expiresAt };
+  }
+
+  public getByAccount(accountId: string): BindCodeRecord | null {
+    const row = this.db.prepare(`
+      SELECT account_id, code, created_at, expires_at
+      FROM bind_codes
+      WHERE account_id = ?
+    `).get(accountId) as Record<string, unknown> | undefined;
+    return row ? parseBindCodeRow(row) : null;
+  }
+
+  public consume(accountId: string, code: string, nowIsoStr: string): BindCodeRecord | null {
+    const row = this.db.prepare(`
+      SELECT account_id, code, created_at, expires_at
+      FROM bind_codes
+      WHERE account_id = ? AND code = ? AND expires_at > ?
+    `).get(accountId, code, nowIsoStr) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    this.db.prepare(`DELETE FROM bind_codes WHERE account_id = ?`).run(accountId);
+    return parseBindCodeRow(row);
+  }
+
+  public deleteByAccount(accountId: string): void {
+    this.db.prepare(`DELETE FROM bind_codes WHERE account_id = ?`).run(accountId);
+  }
+
+  public deleteExpired(nowIsoStr: string): void {
+    this.db.prepare(`DELETE FROM bind_codes WHERE expires_at <= ?`).run(nowIsoStr);
   }
 }
 
