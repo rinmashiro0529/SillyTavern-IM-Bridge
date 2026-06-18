@@ -16,7 +16,8 @@ module.exports = (_env, argv) => {
     resolve: {
       extensions: [".ts", ".js"],
       alias: {
-        "abort-controller$": path.resolve(__dirname, "src/plugin/abort-controller-shim.js"),
+        [path.resolve(__dirname, "node_modules/grammy/out/shim.node.js")]:
+          path.resolve(__dirname, "src/plugin/grammy-shim-node.js"),
       },
     },
     module: {
