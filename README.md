@@ -2,17 +2,24 @@
 
 SillyTavern server plugin: bridge ST chats to instant messaging channels (currently Telegram).
 
+> 配套 UI 扩展：[SillyTavern-IM-Bridge-UI](https://github.com/rinmashiro0529/SillyTavern-IM-Bridge-UI)
+> 完整交接文档：本仓库 `PROJECT_HANDOVER.md`
+
 ## 安装
 
-1. 在 SillyTavern 的 `config.yaml` 设置 `enableServerPlugins: true`。
+1. 在 SillyTavern 的 `config.yaml` 设置 `enableServerPlugins: true`（**默认值是 `false`**，必须显式打开）。
 2. 进入 SillyTavern 的 `plugins/` 目录：
    ```sh
    cd plugins
    git clone https://github.com/rinmashiro0529/SillyTavern-IM-Bridge.git st-im-bridge
    ```
-   仓库已包含构建好的 `dist/index.js`，无需 `npm install`。
+   仓库已包含构建好的 `dist/index.js`，**最终用户无需 `npm install`**（仅二次开发者需要）。
+
+   ⚠️ 目录名必须叫 `st-im-bridge`，与 `package.json` 内的 plugin id 一致；ST plugin loader 用目录名做 id 校验（`^[a-z0-9_-]+$`）。
 3. 重启 SillyTavern。
-4. 在 SillyTavern 中安装配套 UI 扩展：[SillyTavern-IM-Bridge-UI](https://github.com/rinmashiro0529/SillyTavern-IM-Bridge-UI)。
+4. 安装配套 UI 扩展（任选一种方式）：
+   - **网页方式**：SillyTavern 网页 → Extensions → Install Extension → 粘贴 `https://github.com/rinmashiro0529/SillyTavern-IM-Bridge-UI.git`。该方式装到当前登录 handle 的 `data/<handle>/extensions/`。
+   - **服务端方式**：直接 `git clone` 到 `<ST 数据目录>/<handle>/extensions/SillyTavern-IM-Bridge-UI/`，多个 handle 各自一份。
 
 ## 路径与端口
 
@@ -28,7 +35,9 @@ SillyTavern server plugin: bridge ST chats to instant messaging channels (curren
 
 ## 鉴权
 
-复用 SillyTavern 自身的登录态：所有路由位于 ST `requireLoginMiddleware` 之后，写操作需要带 `x-csrf-token` 头（由 `GET /csrf-token` 获取）。
+复用 SillyTavern 自身的登录态：所有路由位于 ST `requireLoginMiddleware` 之后。
+
+写操作（非 `GET`/`HEAD`）必须带 `x-csrf-token` 头 —— ST 的 `csrfSynchronisedProtection` 中间件对 plugin 路由也生效，**无法 opt out**。前端可先 `GET /csrf-token` 获取并缓存，403 时清缓存重试一次（UI 扩展已经实现了这套逻辑）。
 
 ## 端到端验证
 
@@ -36,11 +45,13 @@ SillyTavern server plugin: bridge ST chats to instant messaging channels (curren
 2. `curl --cookie <ST 会话 cookie> http://localhost:8000/api/plugins/st-im-bridge/probe` 返回 204。
    > 提示：cookie 含登录态，避免直接粘贴到 shell 命令行（会进 history）。建议把 cookie 写入受限权限的文件用 `--cookie @cookies.txt` 读入，或先 `read -s COOKIE` 再 `curl --cookie "$COOKIE" ...`。
 3. 安装 UI 扩展，打开抽屉，填入 Telegram bot token，点击「保存 Token」「启动」。
-4. Telegram 私聊 bot：`/help`、`/chars`、`/now`、`/compress`、`/cmodel` 等命令应当与原 bridge 行为一致。
+4. 在 UI 内点「生成绑定码」，到 Telegram 私聊 bot 发送 `/bind <code>`；绑定成功后该 TG 账号即可使用 `/help`、`/chars`、`/now`、`/compress`、`/cmodel` 等命令（配对码 5 分钟有效，单次使用，详见 `PROJECT_HANDOVER.md`）。
 
 ## 数据
 
-SQLite 数据文件位于 `<plugin 根目录>/data/app.db`。表结构与原独立服务兼容，新增 `accounts.st_user_handle/role` 列与 `account_configs` 表。
+SQLite 数据文件位于 `<plugin 根目录>/data/app.db`（启用 WAL，运行后会附带 `app.db-wal` / `app.db-shm`，备份时三个一起复制）。表结构包含 `accounts`、`account_configs`、`bind_codes`、`active_sessions`、`recent_sessions`、`turn_records`、`history_sync_*`、`external_identities`、`app_metadata` 等，由 `ensureCurrentSchema(db)` 幂等 `CREATE IF NOT EXISTS` + `ALTER` 维护。
+
+⚠️ **Telegram bot token 在 `account_configs.telegram_bot_token` 字段中以明文存储**。请将 `data/` 目录权限收紧（建议 `chmod 700`）；勿将整个 plugin 目录打包外传。
 
 ## 许可
 
